@@ -10,7 +10,7 @@ name: supabase
 services:
 
   studio:
-    image: supabase/studio:20250113-83c9420
+    image: supabase/studio:2025.04.21-sha-173cc56
     restart: unless-stopped
     healthcheck:
       test:
@@ -71,7 +71,7 @@ services:
       /docker-entrypoint.sh kong docker-start'
 
   auth:
-    image: supabase/gotrue:v2.167.0
+    image: supabase/gotrue:v2.171.0
     restart: unless-stopped
     healthcheck:
       test:
@@ -113,7 +113,7 @@ services:
       # (demais hooks/mailers omitidos para brevidade)
 
   rest:
-    image: postgrest/postgrest:v12.2.0
+    image: postgrest/postgrest:v12.2.11
     restart: unless-stopped
     depends_on:
       db:
@@ -132,7 +132,7 @@ services:
     command: [ "postgrest" ]
 
   realtime:
-    image: supabase/realtime:v2.34.7
+    image: supabase/realtime:v2.34.47
     restart: unless-stopped
     depends_on:
       db:
@@ -175,7 +175,7 @@ services:
       RUN_JANITOR: true
 
   storage:
-    image: supabase/storage-api:v1.14.5
+    image: supabase/storage-api:v1.22.7
     restart: unless-stopped
     volumes:
       - ./volumes/storage:/var/lib/storage
@@ -247,7 +247,7 @@ services:
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
 
   functions:
-    image: supabase/edge-runtime:v1.67.0
+    image: supabase/edge-runtime:v1.67.4
     restart: unless-stopped
     volumes:
       - ./volumes/functions:/home/deno/functions:Z
@@ -264,7 +264,7 @@ services:
     command: [ "start", "--main-service", "/home/deno/functions/main" ]
 
   analytics:
-    image: supabase/logflare:1.4.0
+    image: supabase/logflare:1.12.0
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "curl", "http://localhost:4000/health" ]
@@ -291,7 +291,7 @@ services:
       LOGFLARE_FEATURE_FLAG_OVERRIDE: multibackend=true
 
   db:
-    image: supabase/postgres:15.8.1.020
+    image: supabase/postgres:15.8.1.060
     restart: unless-stopped
     # exposição da porta do banco
     ports:
@@ -350,7 +350,7 @@ services:
     command: ["--config", "/etc/vector/vector.yml"]
 
   supavisor:
-    image: supabase/supavisor:1.1.56
+    image: supabase/supavisor:2.5.1
     restart: unless-stopped
     volumes:
       - ./volumes/pooler/pooler.exs:/etc/pooler/pooler.exs:ro
