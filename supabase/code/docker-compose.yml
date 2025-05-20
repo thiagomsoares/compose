@@ -52,16 +52,23 @@ services:
   kong:
     image: kong:3.9.0
     restart: unless-stopped
+
+    # monta o seu arquivo declarativo diretamente
     volumes:
-      # https://github.com/supabase/supabase/issues/12661
-      - ./volumes/api/kong.yml:/home/kong/temp.yml:ro
+      - ./volumes/api/kong.yml:/home/kong/kong.yml:ro
+
+    ports:
+      - "${KONG_HTTP_PORT}:8000"
+      - "${KONG_HTTPS_PORT}:8443"
+
     depends_on:
       analytics:
         condition: service_healthy
+
     environment:
       KONG_DATABASE: "off"
+      # agora aponta direto para o arquivo montado, sem precisar copiar
       KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
-      # https://github.com/supabase/cli/issues/14
       KONG_DNS_ORDER: LAST,A,CNAME
       KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
@@ -70,9 +77,11 @@ services:
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       DASHBOARD_USERNAME: ${DASHBOARD_USERNAME}
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
-    # https://unix.stackexchange.com/a/294837
-    entrypoint: bash -c 'eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml &&
-      /docker-entrypoint.sh kong docker-start'
+
+    # não precisamos mais do entrypoint manual:
+    # entrypoint: >
+    #   bash -c 'eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml &&
+    #   /docker-entrypoint.sh kong docker-start'
 
   auth:
     image: supabase/gotrue:v2.171.0
