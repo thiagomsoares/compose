@@ -326,7 +326,7 @@ services:
       - log_min_messages=fatal
 
   vector:
-    image: timberio/vector:0.46.1-alpine
+    image: timberio/vector:0.28.1-alpine
     restart: unless-stopped
     volumes:
       - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro
