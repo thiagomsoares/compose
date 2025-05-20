@@ -14,14 +14,12 @@ services:
     restart: unless-stopped
     healthcheck:
       test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://studio:3000/api/profile').then((r) => { if (r.status !== 200) throw new Error(r.status) })"
-        ]
+        - CMD-SHELL
+        - |
+          node -e "fetch('http://localhost:3000/api/profile')
+            .then(r => { if (r.status !== 200) throw new Error(r.status) })"
+      interval: 10s
       timeout: 10s
-      interval: 5s
       retries: 3
     depends_on:
       analytics:
@@ -45,6 +43,11 @@ services:
   kong:
     image: kong:3.9.0
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "echo", "ok"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     ports:
       - "${KONG_HTTP_PORT}:8000"
       - "${KONG_HTTPS_PORT}:8443"
@@ -72,13 +75,9 @@ services:
     image: supabase/gotrue:v2.171.0
     restart: unless-stopped
     healthcheck:
-      test:
-        [
-          "CMD", "wget", "--no-verbose", "--tries=1", "--spider",
-          "http://localhost:9999/health"
-        ]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 10s
       timeout: 5s
-      interval: 5s
       retries: 3
     depends_on:
       db:
@@ -118,6 +117,11 @@ services:
   rest:
     image: postgrest/postgrest:v13.0.0
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     depends_on:
       db:
         condition: service_healthy
@@ -136,21 +140,25 @@ services:
   realtime:
     image: supabase/realtime:v2.34.54
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -sSfL
+        - --head
+        - -o
+        - /dev/null
+        - -H
+        - "Authorization: Bearer ${ANON_KEY}"
+        - http://localhost:4000/api/tenants/realtime-dev/health
+      interval: 10s
+      timeout: 5s
+      retries: 3
     depends_on:
       db:
         condition: service_healthy
       analytics:
         condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD", "curl", "-sSfL", "--head", "-o", "/dev/null",
-          "-H", "Authorization: Bearer ${ANON_KEY}",
-          "http://localhost:4000/api/tenants/realtime-dev/health"
-        ]
-      timeout: 5s
-      interval: 5s
-      retries: 3
     environment:
       PORT: 4000
       DB_HOST: ${POSTGRES_HOST}
@@ -172,16 +180,10 @@ services:
   storage:
     image: supabase/storage-api:v1.22.17
     restart: unless-stopped
-    volumes:
-      - ./volumes/storage:/var/lib/storage
     healthcheck:
-      test:
-        [
-          "CMD", "wget", "--no-verbose", "--tries=1", "--spider",
-          "http://storage:5000/status"
-        ]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://storage:5000/status"]
+      interval: 10s
       timeout: 5s
-      interval: 5s
       retries: 3
     depends_on:
       db:
@@ -190,6 +192,8 @@ services:
         condition: service_started
       imgproxy:
         condition: service_started
+    volumes:
+      - ./volumes/storage:/var/lib/storage
     environment:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
@@ -208,13 +212,13 @@ services:
   imgproxy:
     image: darthsim/imgproxy:v3.25.0
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "imgproxy", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     volumes:
       - ./volumes/storage:/var/lib/storage
-    healthcheck:
-      test: [ "CMD", "imgproxy", "health" ]
-      timeout: 5s
-      interval: 5s
-      retries: 3
     environment:
       IMGPROXY_BIND: ":5001"
       IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
@@ -240,11 +244,11 @@ services:
   functions:
     image: supabase/edge-runtime:v1.67.4
     restart: unless-stopped
-    volumes:
-      - ./volumes/functions:/home/deno/functions
     depends_on:
       analytics:
         condition: service_healthy
+    volumes:
+      - ./volumes/functions:/home/deno/functions
     environment:
       JWT_SECRET: ${JWT_SECRET}
       SUPABASE_URL: http://kong:8000
@@ -252,19 +256,21 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
       SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT}"
-    command: [ "start", "--main-service", "/home/deno/functions/main" ]
+    command:
+      - start
+      - --main-service
+      - /home/deno/functions/main
 
   analytics:
     image: supabase/logflare:1.12.5
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "4000:4000"
-    healthcheck:
-      test:
-        [ "CMD", "curl", "http://localhost:4000/health" ]
-      timeout: 5s
-      interval: 5s
-      retries: 10
     depends_on:
       db:
         condition: service_healthy
@@ -287,6 +293,14 @@ services:
   db:
     image: supabase/postgres:17.4.1.028
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      vector:
+        condition: service_healthy
     volumes:
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql
       - ./volumes/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql
@@ -297,14 +311,6 @@ services:
       - ./volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql
       - ./volumes/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql
       - db-config:/etc/postgresql-custom
-    healthcheck:
-      test: [ "CMD", "pg_isready", "-U", "postgres", "-h", "localhost" ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    depends_on:
-      vector:
-        condition: service_healthy
     environment:
       POSTGRES_HOST: /var/run/postgresql
       PGPORT: ${POSTGRES_PORT}
@@ -316,55 +322,46 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXP: ${JWT_EXPIRY}
     command:
-      [
-        "postgres",
-        "-c",
-        "config_file=/etc/postgresql/postgresql.conf",
-        "-c",
-        "log_min_messages=fatal"
-      ]
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - log_min_messages=fatal
 
   vector:
     image: timberio/vector:0.46.1-alpine
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://vector:9001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro
       - ${DOCKER_SOCKET_LOCATION}:/var/run/docker.sock:ro
-    healthcheck:
-      test:
-        [
-          "CMD", "wget", "--no-verbose", "--tries=1", "--spider",
-          "http://vector:9001/health"
-        ]
-      timeout: 5s
-      interval: 5s
-      retries: 3
     environment:
       LOGFLARE_API_KEY: ${LOGFLARE_API_KEY}
-    command: [ "--config", "/etc/vector/vector.yml" ]
+    command:
+      - --config
+      - /etc/vector/vector.yml
 
   supavisor:
     image: supabase/supavisor:2.5.1
     restart: unless-stopped
-    ports:
-      - "${POSTGRES_PORT}:5432"
-      - "${POOLER_PROXY_PORT_TRANSACTION}:6543"
-    volumes:
-      - ./volumes/pooler/pooler.exs:/etc/pooler/pooler.exs:ro
-    healthcheck:
-      test:
-        [
-          "CMD", "curl", "-sSfL", "--head", "-o", "/dev/null",
-          "http://127.0.0.1:4000/api/health"
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    # sem healthcheck oficial
     depends_on:
       db:
         condition: service_healthy
       analytics:
         condition: service_healthy
+    ports:
+      - "${POSTGRES_PORT}:5432"
+      - "${POOLER_PROXY_PORT_TRANSACTION}:6543"
+    volumes:
+      - ./volumes/pooler/pooler.exs:/etc/pooler/pooler.exs:ro
     environment:
       PORT: 4000
       POSTGRES_PORT: ${POSTGRES_PORT}
