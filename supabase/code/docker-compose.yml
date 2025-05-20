@@ -328,22 +328,25 @@ services:
   vector:
     image: timberio/vector:0.46.1-alpine
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://vector:9001/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    depends_on:
-      db:
-        condition: service_healthy
     volumes:
       - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro
       - ${DOCKER_SOCKET_LOCATION}:/var/run/docker.sock:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://vector:9001/health"
+        ]
+      timeout: 5s
+      interval: 5s
+      retries: 3
     environment:
       LOGFLARE_API_KEY: ${LOGFLARE_API_KEY}
-    command:
-      - --config
-      - /etc/vector/vector.yml
+    command: [ "--config", "/etc/vector/vector.yml" ]
 
   supavisor:
     image: supabase/supavisor:2.5.1
