@@ -288,7 +288,7 @@ services:
       LOGFLARE_FEATURE_FLAG_OVERRIDE: multibackend=true
 
   db:
-    image: supabase/postgres:17.4.1.028
+    image: supabase/postgres:15.8.1.091
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
