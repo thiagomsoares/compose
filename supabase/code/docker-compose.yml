@@ -294,7 +294,15 @@ services:
     image: supabase/postgres:17.4.1.028
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test:
+        [
+        "CMD",
+        "pg_isready",
+        "-U",
+        "postgres",
+        "-h",
+        "localhost"
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
